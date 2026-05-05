@@ -15,6 +15,7 @@ import com.Ben.closetstylist.data.SettingsRepository
 import com.Ben.closetstylist.data.WeatherRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import com.Ben.closetstylist.domain.StylistPersona
 import com.Ben.closetstylist.domain.OutfitJsonParser
 import com.Ben.closetstylist.domain.ParsedOutfit
