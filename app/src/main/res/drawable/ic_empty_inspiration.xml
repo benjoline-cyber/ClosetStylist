@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Photo frame -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#000000"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 3,6 L 3,20 L 21,20 L 21,6 Z"/>
+    <!-- Landscape scene -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#000000"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 3,15 L 8,11 L 12,14 L 16,10 L 21,15"/>
+    <!-- Sun (filled circle via two semicircle arcs) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 6.5,9 A 1,1 0 0,0 8.5,9 A 1,1 0 0,0 6.5,9 Z"/>
+</vector>

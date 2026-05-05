@@ -1,0 +1,76 @@
+<resources>
+    <string name="app_name">ClosetStylist</string>
+
+    <!-- Bottom navigation tabs -->
+    <string name="tab_closet">Closet</string>
+    <string name="tab_inspiration">Inspiration</string>
+    <string name="tab_suggest">Suggest</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_claude_key_label">Claude API Key</string>
+    <string name="settings_claude_key_hint">sk-ant-…</string>
+    <string name="settings_weather_key_label">OpenWeatherMap API Key</string>
+    <string name="settings_weather_key_hint">Your OWM key</string>
+    <string name="settings_save_key">Save</string>
+    <string name="settings_key_saved">Saved</string>
+    <string name="settings_show">Show</string>
+    <string name="settings_hide">Hide</string>
+
+    <!-- Closet screen -->
+    <string name="closet_add_item">Add item</string>
+    <string name="closet_empty">Your closet is empty\nTap + to add your first item</string>
+    <string name="filter_all">All</string>
+
+    <!-- Add item screen -->
+    <string name="add_item_title">Add Item</string>
+    <string name="add_item_take_photo">Take Photo</string>
+    <string name="add_item_choose_gallery">Choose from Gallery</string>
+    <string name="add_item_change_image">Change image</string>
+    <string name="add_item_category_label">Category</string>
+    <string name="add_item_colors_label">Colors</string>
+    <string name="add_item_colors_hint">e.g. navy blue</string>
+    <string name="add_item_add_color">Add</string>
+    <string name="add_item_seasons_label">Seasons</string>
+    <string name="add_item_save">Save Item</string>
+    <string name="add_item_saving">Saving…</string>
+
+    <!-- Errors -->
+    <string name="error_load_image">Couldn\'t load image — try again</string>
+    <string name="error_describe_item">Saved without description — check your Claude API key in Settings</string>
+    <string name="error_save_item">Couldn\'t save item — try again</string>
+
+    <!-- Inspiration screen -->
+    <string name="inspiration_add_photo">Add photo</string>
+    <string name="inspiration_empty">No inspiration yet\nTap + to add your first photo</string>
+    <string name="inspiration_picker_title">Add inspiration photo</string>
+    <string name="inspiration_take_photo">Take Photo</string>
+    <string name="inspiration_from_gallery">Choose from Gallery</string>
+    <string name="inspiration_delete_title">Delete this photo?</string>
+    <string name="inspiration_delete_confirm">Delete</string>
+    <string name="inspiration_delete_cancel">Cancel</string>
+    <string name="error_save_photo">Couldn\'t save photo — try again</string>
+
+    <!-- Suggest screen -->
+    <string name="suggest_generate_button">Suggest 3 Outfits</string>
+    <string name="suggest_generating_button">Generating…</string>
+    <string name="suggest_generating">Getting outfit suggestions…</string>
+    <string name="suggest_outfit_number">Outfit %1$d</string>
+    <string name="suggest_wore_today">Wore this today</string>
+    <string name="suggest_wore_it">Wore it</string>
+    <string name="suggest_not_today">Not today</string>
+    <string name="suggest_never_combo">Never this combo</string>
+    <string name="suggest_undo">Undo</string>
+    <string name="suggest_wore_snackbar">Marked as worn today</string>
+    <string name="suggest_dismissed_snackbar">Outfit dismissed</string>
+    <string name="suggest_rejected_snackbar">Won\'t suggest this combo again</string>
+    <string name="suggest_weather_label">Weather: %1$s</string>
+    <string name="suggest_empty_hint">Tap the button above to get outfit suggestions based on today\'s weather</string>
+    <string name="suggest_retry">Try again</string>
+    <string name="error_suggest_empty_closet">No clothes available — add items or wait a few days since last wear</string>
+    <string name="error_suggest_failed">Couldn\'t generate outfits — try again</string>
+    <string name="error_suggest_no_api_key">Check your Claude and Weather API keys in Settings</string>
+    <string name="error_suggest_no_location">Couldn\'t get location — try again outdoors or check permissions</string>
+    <string name="error_suggest_location_permission">Location permission needed for weather — please allow in Settings</string>
+</resources>

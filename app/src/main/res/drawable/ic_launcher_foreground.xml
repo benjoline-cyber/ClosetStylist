@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Hanger body: shoulder peak → bottom-left → bar → bottom-right → back to peak -->
+    <!-- Stem up from peak, then bezier hook curving right -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 54,52 L 22,78 L 86,78 L 54,52 M 54,52 L 54,40 Q 66,40 66,30"/>
+</vector>
