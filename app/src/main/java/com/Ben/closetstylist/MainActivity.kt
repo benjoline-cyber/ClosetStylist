@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -81,10 +84,16 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                 ) { innerPadding ->
+                    val tabFadeIn = fadeIn(animationSpec = tween(220))
+                    val tabFadeOut = fadeOut(animationSpec = tween(180))
                     NavHost(
                         navController = navController,
                         startDestination = Tab.Closet.route,
                         modifier = Modifier.padding(innerPadding),
+                        enterTransition = { tabFadeIn },
+                        exitTransition = { tabFadeOut },
+                        popEnterTransition = { tabFadeIn },
+                        popExitTransition = { tabFadeOut },
                     ) {
                         composable(Tab.Closet.route) {
                             val vm: ClosetViewModel = viewModel(
@@ -129,11 +138,25 @@ class MainActivity : ComponentActivity() {
                                     app.appContainer.outfitFeedbackRepository,
                                 ),
                             )
-                            SuggestScreen(viewModel = vm)
+                            SuggestScreen(
+                                viewModel = vm,
+                                onNavigateToCloset = {
+                                    navController.navigate(Tab.Closet.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
                         }
                         composable(Tab.Settings.route) {
                             val vm: SettingsViewModel = viewModel(
-                                factory = SettingsViewModel.Factory(app.appContainer.settingsRepository),
+                                factory = SettingsViewModel.Factory(
+                                    app.appContainer.settingsRepository,
+                                    app.appContainer.claudeRepository,
+                                ),
                             )
                             SettingsScreen(viewModel = vm)
                         }

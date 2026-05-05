@@ -4,13 +4,20 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Hanger body: shoulder peak → bottom-left → bar → bottom-right → back to peak -->
-    <!-- Stem up from peak, then bezier hook curving right -->
+    <!-- Hook stem: vertical up from shoulder peak, then curved right -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="6"
+        android:strokeWidth="5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M 54,52 L 22,78 L 86,78 L 54,52 M 54,52 L 54,40 Q 66,40 66,30"/>
+        android:pathData="M 54,50 L 54,38 Q 54,28 64,28 Q 70,28 70,33"/>
+    <!-- Hanger shoulders: peak to bottom-left corner, then bar, then bottom-right, back to peak -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 54,50 L 20,76 Q 18,80 22,80 L 86,80 Q 90,80 88,76 Z"/>
 </vector>

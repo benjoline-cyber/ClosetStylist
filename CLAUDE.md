@@ -90,13 +90,41 @@ No preamble." Save to `description`. This runs once per item, not per suggestion
 `SettingsRepository` wraps `EncryptedSharedPreferences`. Keys: `claude_api_key`, `weather_api_key`.
 Never log keys. Never include them in error messages shown to the user.
 
+Settings screen shows saved keys as `••••••••wxyz` (last 4 chars). An "Edit" button replaces the
+masked display with a text field for re-entry. A "Test connection" button sends a 5-token minimal
+request to verify the Claude key is valid without spending meaningful API credit.
+
+## Loading and empty states
+
+Every screen that loads from DB distinguishes three states via an `isLoaded: Boolean` flag in UiState:
+- `!isLoaded` → skeleton shimmer (pulsing `SkeletonBox`/`SkeletonOutfitCard` composables in `ui/common/Skeleton.kt`)
+- `isLoaded && items.isEmpty()` → empty state with icon, body copy, and an action button
+- `isLoaded && items.isNotEmpty()` → normal content
+
+`isLoaded` only becomes `true` after the first DB emission (set via `.onEach { isLoaded = true }`),
+never in the initial `stateIn` value, to prevent an empty-state flash.
+
+## Add-item speed
+
+`AddItemViewModel.save()` saves immediately with `description=""` and navigates back right away.
+The Claude describe call fires in `ClosetStylistApplication.applicationScope` so it survives
+navigation. When it completes, `ClothingRepository.updateItem()` patches the description in place.
+
+## Navigation transitions
+
+All `NavHost` composables use `fadeIn(tween(220))` / `fadeOut(tween(180))` as default enter/exit
+transitions. `addItem` uses the same defaults so the sheet-style add screen also fades.
+
 ## Conventions
 
 - Composables: PascalCase, one screen per file, `XxxScreen.kt` + `XxxViewModel.kt`
 - One Composable per file for screens; small reusable Composables can share a file
 - No `!!` operator. Use `?:` with sensible defaults or fail loudly with `error("...")`
 - All user-facing strings in `res/values/strings.xml` from day one (don't hardcode)
+- No hardcoded font sizes — always use `MaterialTheme.typography.*` tokens
 - Errors shown to the user are short and actionable ("No internet — try again") — never raw exceptions
+- Haptic feedback: use `HapticFeedbackType.LongPress` for destructive/confirming taps,
+  `TextHandleMove` for lighter dismissal taps
 - Format: `ktlint` defaults
 
 ## Testing
@@ -107,12 +135,12 @@ Never log keys. Never include them in error messages shown to the user.
 
 ## Build order (work top-down, don't skip)
 
-1. Settings screen + EncryptedSharedPreferences (need keys before anything else works)
-2. Room setup: entities, DAOs, database, AppContainer wiring
-3. Closet tab: add item (camera/gallery → save image → Claude describes it → save to DB), list view, filters
-4. Inspiration tab: add photo, gallery view, delete
-5. Suggest tab: location + weather, prompt builder, Claude call, JSON parse, 3-card display, "wore this" action
-6. Polish: loading states, empty states, error toasts, app icon
+1. Settings screen + EncryptedSharedPreferences (need keys before anything else works) ✓
+2. Room setup: entities, DAOs, database, AppContainer wiring ✓
+3. Closet tab: add item (camera/gallery → save image → Claude describes it → save to DB), list view, filters ✓
+4. Inspiration tab: add photo, gallery view, delete ✓
+5. Suggest tab: location + weather, prompt builder, Claude call, JSON parse, 3-card display, "wore this" action ✓
+6. Polish: loading states, empty states, error toasts, app icon ✓
 
 ## Things to ask me before doing
 

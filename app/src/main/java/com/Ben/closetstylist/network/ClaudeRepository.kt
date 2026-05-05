@@ -100,6 +100,22 @@ class ClaudeRepository(private val settingsRepository: SettingsRepository) {
             ?: ""
     }
 
+    suspend fun testConnection(): Boolean {
+        val key = settingsRepository.claudeApiKey.value
+        if (key.isEmpty()) return false
+        val request = ClaudeRequest(
+            model = "claude-haiku-4-5-20251001",
+            maxTokens = 5,
+            messages = listOf(
+                ClaudeMessage(
+                    role = "user",
+                    content = listOf(buildJsonObject { put("type", "text"); put("text", "Reply: OK") }),
+                ),
+            ),
+        )
+        return runCatching { service.createMessage(request) }.isSuccess
+    }
+
     companion object {
         private const val DESCRIBE_PROMPT =
             "Describe this clothing item in one sentence covering type, color, pattern, and material if visible. No preamble."

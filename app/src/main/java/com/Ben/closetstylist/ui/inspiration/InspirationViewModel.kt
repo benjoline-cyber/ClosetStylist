@@ -12,10 +12,13 @@ import com.Ben.closetstylist.util.compressImageFromUri
 import com.Ben.closetstylist.util.saveToInspirationDir
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,7 +31,11 @@ class InspirationViewModel(
     private val repository: InspirationRepository,
 ) : AndroidViewModel(app) {
 
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
     val photos: StateFlow<List<InspirationPhoto>> = repository.getAllPhotos()
+        .onEach { _isLoaded.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _events = MutableSharedFlow<String>()

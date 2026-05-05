@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -32,14 +34,18 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,6 +73,8 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    var showPickerSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -82,6 +90,7 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
 
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) viewModel.setImageUri(cameraUri)
+        showPickerSheet = false
     }
 
     val cameraPermLauncher = rememberLauncherForActivityResult(
@@ -92,6 +101,7 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
 
     val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { viewModel.setImageUri(it) }
+        showPickerSheet = false
     }
 
     fun launchCamera() {
@@ -100,6 +110,42 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
             takePicture.launch(cameraUri)
         } else {
             cameraPermLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    // Auto-show picker the first time this screen opens (no photo yet).
+    LaunchedEffect(uiState.showPickerOnLoad) {
+        if (uiState.showPickerOnLoad) {
+            showPickerSheet = true
+            viewModel.pickerShown()
+        }
+    }
+
+    if (showPickerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showPickerSheet = false },
+            sheetState = sheetState,
+        ) {
+            Text(
+                text = stringResource(R.string.add_item_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.add_item_take_photo)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { launchCamera() },
+            )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.add_item_choose_gallery)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+            )
+            Spacer(Modifier.navigationBarsPadding())
         }
     }
 
@@ -126,10 +172,8 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
             ) {
                 ImageSection(
                     imageUri = uiState.imageUri,
-                    onTakePhoto = ::launchCamera,
-                    onChooseGallery = {
-                        pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    },
+                    isSaving = uiState.isSaving,
+                    onChangePhoto = { showPickerSheet = true },
                 )
                 CategorySection(
                     selected = uiState.category,
@@ -157,11 +201,20 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
             }
 
             if (uiState.isSaving) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text(stringResource(R.string.add_item_saving), style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
@@ -171,38 +224,39 @@ fun AddItemScreen(viewModel: AddItemViewModel, onNavigateBack: () -> Unit) {
 @Composable
 private fun ImageSection(
     imageUri: android.net.Uri?,
-    onTakePhoto: () -> Unit,
-    onChooseGallery: () -> Unit,
+    isSaving: Boolean,
+    onChangePhoto: () -> Unit,
 ) {
-    if (imageUri == null) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedButton(onClick = onTakePhoto, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.add_item_take_photo))
-            }
-            OutlinedButton(onClick = onChooseGallery, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.add_item_choose_gallery))
-            }
-        }
-    } else {
-        Box(modifier = Modifier.fillMaxWidth()) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f),
+    ) {
+        if (imageUri != null) {
             AsyncImage(
                 model = imageUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
+                modifier = Modifier.fillMaxSize(),
             )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {}
+        }
+        if (!isSaving) {
             OutlinedButton(
-                onClick = onChooseGallery,
+                onClick = onChangePhoto,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(8.dp),
             ) {
-                Text(stringResource(R.string.add_item_change_image))
+                Text(
+                    stringResource(
+                        if (imageUri == null) R.string.add_item_take_photo else R.string.add_item_change_image,
+                    ),
+                )
             }
         }
     }

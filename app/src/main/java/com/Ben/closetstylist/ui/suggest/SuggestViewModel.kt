@@ -13,6 +13,8 @@ import com.Ben.closetstylist.data.OutfitFeedback
 import com.Ben.closetstylist.data.OutfitFeedbackRepository
 import com.Ben.closetstylist.data.SettingsRepository
 import com.Ben.closetstylist.data.WeatherRepository
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import com.Ben.closetstylist.domain.StylistPersona
 import com.Ben.closetstylist.domain.OutfitJsonParser
 import com.Ben.closetstylist.domain.ParsedOutfit
@@ -45,6 +47,9 @@ data class SuggestUiState(
     val outfits: List<OutfitSuggestion> = emptyList(),
     val error: String? = null,
     val collapsedKeys: Set<String> = emptySet(),
+    val loadingCaption: String = "",
+    val weatherStale: Boolean = false,
+    val awaitingWeatherChoice: Boolean = false,
 )
 
 sealed class FeedbackResult {
@@ -78,6 +83,14 @@ class SuggestViewModel(
 
     fun selectPersona(persona: StylistPersona) = settingsRepository.savePersona(persona)
 
+    val hasInspiration: StateFlow<Boolean> = inspirationRepository.getAllPhotos()
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val itemCount: StateFlow<Int> = clothingRepository.getAllItems()
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     private val _uiState = MutableStateFlow(SuggestUiState())
     val uiState: StateFlow<SuggestUiState> = _uiState.asStateFlow()
 
@@ -90,6 +103,23 @@ class SuggestViewModel(
     private val _debugWeatherOverride = MutableStateFlow<WeatherInfo?>(null)
     val debugWeatherOverride: StateFlow<WeatherInfo?> = _debugWeatherOverride.asStateFlow()
 
+    private val _manualWeatherPreset = MutableStateFlow<WeatherInfo?>(null)
+
+    private val _refreshReason = MutableStateFlow("")
+    val refreshReason: StateFlow<String> = _refreshReason.asStateFlow()
+
+    fun onRefreshReasonChange(value: String) { _refreshReason.value = value }
+
+    fun selectWeatherPreset(weather: WeatherInfo) {
+        _manualWeatherPreset.value = weather
+        _uiState.value = _uiState.value.copy(awaitingWeatherChoice = false)
+        generateSuggestions()
+    }
+
+    private var cachedWeather: WeatherInfo? = null
+    private var cacheTimestamp: Long = 0L
+    private val cacheMaxAgeMs = 2 * 60 * 60 * 1000L
+
     fun setDebugWeather(tempCelsius: Double, condition: String) {
         _debugWeatherOverride.value = WeatherInfo(tempCelsius, condition, "Debug")
     }
@@ -101,12 +131,13 @@ class SuggestViewModel(
     fun generateSuggestions() {
         viewModelScope.launch {
             _uiState.value = SuggestUiState(isLoading = true)
-            runCatching {
-                val app = getApplication<Application>()
-                val weather = _debugWeatherOverride.value ?: run {
-                    val (lat, lon) = getCurrentLocation(app)
-                    weatherRepository.fetchWeather(lat, lon)
-                }
+            val app = getApplication<Application>()
+            try {
+                val weather = _debugWeatherOverride.value
+                    ?: _manualWeatherPreset.value
+                    ?: fetchWeatherWithCache(app)
+                    ?: return@launch
+
                 _weatherSummary.value = weather.summary()
 
                 val cutoff = LocalDate.now().minusDays(3)
@@ -119,6 +150,18 @@ class SuggestViewModel(
                     return@launch
                 }
 
+                val persona = settingsRepository.selectedPersona.value
+                _uiState.value = SuggestUiState(
+                    isLoading = true,
+                    loadingCaption = app.getString(
+                        R.string.suggest_loading_caption,
+                        available.size,
+                        weather.summary(),
+                        persona.displayName(),
+                    ),
+                    weatherStale = _uiState.value.weatherStale,
+                )
+
                 val inspirationBytes = inspirationRepository.getAllPhotos().first()
                     .take(3)
                     .mapNotNull { photo ->
@@ -127,7 +170,6 @@ class SuggestViewModel(
                         }.getOrNull()
                     }
 
-                val persona = settingsRepository.selectedPersona.value
                 val rejections = outfitFeedbackRepository.getRecentRejections(persona)
                 val idToItem = available.associateBy { it.id }
                 val rejectionDescriptions = rejections.mapNotNull { feedback ->
@@ -137,7 +179,8 @@ class SuggestViewModel(
                     desc.ifBlank { null }
                 }
 
-                val prompt = PromptBuilder.buildOutfitPrompt(available, weather, persona, rejectionDescriptions)
+                val reason = _refreshReason.value
+                val prompt = PromptBuilder.buildOutfitPrompt(available, weather, persona, rejectionDescriptions, reason)
                 val availableIds = available.map { it.id }.toSet()
                 val parsed = callWithRetry(prompt, inspirationBytes, availableIds)
 
@@ -146,25 +189,57 @@ class SuggestViewModel(
                     if (items.isNotEmpty()) OutfitSuggestion(items, p.rationale) else null
                 }
 
+                _refreshReason.value = ""
+
                 if (suggestions.isEmpty()) {
-                    _uiState.value = SuggestUiState(
-                        error = app.getString(R.string.error_suggest_failed),
-                    )
+                    _uiState.value = SuggestUiState(error = app.getString(R.string.error_suggest_parse_failed))
                 } else {
-                    _uiState.value = SuggestUiState(outfits = suggestions)
+                    _uiState.value = SuggestUiState(outfits = suggestions, weatherStale = _uiState.value.weatherStale)
                 }
-            }.onFailure { e ->
-                val app = getApplication<Application>()
-                val msg = when {
-                    e.message?.contains("API key") == true ->
-                        app.getString(R.string.error_suggest_no_api_key)
-                    e.message?.contains("location", ignoreCase = true) == true ->
-                        app.getString(R.string.error_suggest_no_location)
-                    else -> app.getString(R.string.error_suggest_failed)
-                }
+            } catch (e: Exception) {
+                val msg = errorMessage(app, e)
                 _uiState.value = SuggestUiState(error = msg)
             }
         }
+    }
+
+    private suspend fun fetchWeatherWithCache(app: Application): WeatherInfo? {
+        val isCacheFresh = cachedWeather != null &&
+            System.currentTimeMillis() - cacheTimestamp < cacheMaxAgeMs
+        if (isCacheFresh) {
+            _uiState.value = _uiState.value.copy(weatherStale = true)
+            return cachedWeather
+        }
+        return try {
+            val (lat, lon) = getCurrentLocation(app)
+            val w = weatherRepository.fetchWeather(lat, lon)
+            cachedWeather = w
+            cacheTimestamp = System.currentTimeMillis()
+            _uiState.value = _uiState.value.copy(weatherStale = false)
+            w
+        } catch (e: Exception) {
+            val stale = cachedWeather
+            if (stale != null) {
+                _uiState.value = _uiState.value.copy(weatherStale = true)
+                stale
+            } else {
+                _uiState.value = SuggestUiState(awaitingWeatherChoice = true)
+                null
+            }
+        }
+    }
+
+    private fun errorMessage(app: Application, e: Exception): String = when {
+        e.message?.contains("API key") == true ->
+            app.getString(R.string.error_claude_key_invalid)
+        e.message?.contains("location", ignoreCase = true) == true ->
+            app.getString(R.string.error_suggest_no_location)
+        e.message?.contains("overloaded", ignoreCase = true) == true ||
+            e.message?.contains("529") == true ->
+            app.getString(R.string.error_claude_overloaded)
+        e is java.net.UnknownHostException || e is java.net.ConnectException ->
+            app.getString(R.string.error_no_internet)
+        else -> app.getString(R.string.error_suggest_failed)
     }
 
     fun onWore(outfit: OutfitSuggestion) {

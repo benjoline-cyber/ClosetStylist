@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 data class ClosetUiState(
     val items: List<ClothingItem> = emptyList(),
     val activeFilter: ClothingCategory? = null,
+    val isLoaded: Boolean = false,
 )
 
 class ClosetViewModel(private val repository: ClothingRepository) : ViewModel() {
@@ -27,8 +28,8 @@ class ClosetViewModel(private val repository: ClothingRepository) : ViewModel() 
         activeFilter,
     ) { items, filter ->
         val filtered = if (filter == null) items else items.filter { it.category == filter }
-        ClosetUiState(items = filtered, activeFilter = filter)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ClosetUiState())
+        ClosetUiState(items = filtered, activeFilter = filter, isLoaded = true)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ClosetUiState(isLoaded = false))
 
     fun setFilter(category: ClothingCategory?) {
         activeFilter.value = category

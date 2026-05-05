@@ -10,6 +10,7 @@ object PromptBuilder {
         weather: WeatherInfo,
         persona: StylistPersona,
         recentRejections: List<String> = emptyList(),
+        refreshReason: String = "",
     ): String {
         val season = seasonFrom(LocalDate.now().monthValue)
         val itemLines = availableItems.joinToString("\n") { item ->
@@ -27,11 +28,13 @@ object PromptBuilder {
                 recentRejections.joinToString("\n") { "- $it" }
         } else ""
 
+        val reasonBlock = if (refreshReason.isNotBlank()) "\nUser feedback on last suggestion: $refreshReason" else ""
+
         return """
 Current weather: ${weather.summary()}
 Season: $season
 Style persona: ${persona.description}
-${if (weatherNotes.isNotBlank()) "\nWeather notes:\n$weatherNotes" else ""}$rejectionBlock
+${if (weatherNotes.isNotBlank()) "\nWeather notes:\n$weatherNotes" else ""}$rejectionBlock$reasonBlock
 Available clothing items:
 $itemLines
 

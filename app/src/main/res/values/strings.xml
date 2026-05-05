@@ -20,7 +20,9 @@
 
     <!-- Closet screen -->
     <string name="closet_add_item">Add item</string>
-    <string name="closet_empty">Your closet is empty\nTap + to add your first item</string>
+    <string name="closet_empty">Your closet is empty</string>
+    <string name="closet_empty_body">Add the clothes you wear most.</string>
+    <string name="closet_add_first_item">Add first item</string>
     <string name="filter_all">All</string>
 
     <!-- Add item screen -->
@@ -43,7 +45,9 @@
 
     <!-- Inspiration screen -->
     <string name="inspiration_add_photo">Add photo</string>
-    <string name="inspiration_empty">No inspiration yet\nTap + to add your first photo</string>
+    <string name="inspiration_empty">No inspiration yet</string>
+    <string name="inspiration_empty_body">Save looks you love so I can match your style.</string>
+    <string name="inspiration_add_first">Add inspiration</string>
     <string name="inspiration_picker_title">Add inspiration photo</string>
     <string name="inspiration_take_photo">Take Photo</string>
     <string name="inspiration_from_gallery">Choose from Gallery</string>
@@ -53,6 +57,19 @@
     <string name="error_save_photo">Couldn\'t save photo — try again</string>
 
     <!-- Suggest screen -->
+    <string name="suggest_need_items">Add at least 5 items to your closet first.</string>
+    <string name="suggest_go_to_closet">Go to Closet</string>
+    <string name="suggest_tip_inspiration">Tip: add a few inspiration photos for better suggestions.</string>
+    <string name="suggest_refresh_reason_hint">Why? (optional) — too warm, too formal…</string>
+    <string name="suggest_refresh">Refresh outfits</string>
+    <string name="suggest_weather_stale">Using recent weather — may be slightly stale</string>
+    <string name="suggest_pick_weather">Couldn\'t get weather. Pick a temperature:</string>
+    <string name="weather_cold">Cold (&lt;5°C)</string>
+    <string name="weather_mild">Mild (10–18°C)</string>
+    <string name="weather_warm">Warm (19–25°C)</string>
+    <string name="weather_hot">Hot (&gt;26°C)</string>
+    <string name="suggest_analyzing">Analyzing…</string>
+    <string name="suggest_loading_caption">Considering %1$d items · %2$s · %3$s</string>
     <string name="suggest_generate_button">Suggest 3 Outfits</string>
     <string name="suggest_generating_button">Generating…</string>
     <string name="suggest_generating">Getting outfit suggestions…</string>
@@ -73,4 +90,14 @@
     <string name="error_suggest_no_api_key">Check your Claude and Weather API keys in Settings</string>
     <string name="error_suggest_no_location">Couldn\'t get location — try again outdoors or check permissions</string>
     <string name="error_suggest_location_permission">Location permission needed for weather — please allow in Settings</string>
+    <string name="error_no_internet">Can\'t reach the internet — try again when you\'re connected.</string>
+    <string name="error_claude_key_invalid">Your Claude API key seems wrong. Update it in Settings.</string>
+    <string name="error_claude_overloaded">Style assistant is busy — try again in a moment.</string>
+    <string name="error_suggest_parse_failed">Couldn\'t parse the suggestions. Try again?</string>
+    <!-- Settings screen polish -->
+    <string name="settings_test_connection_label">Test Connection</string>
+    <string name="settings_test_connection_body">Sends a minimal request to verify your Claude API key works.</string>
+    <string name="settings_test_connection_button">Test connection</string>
+    <string name="settings_test_connection_success">Connected — key is working</string>
+    <string name="settings_edit_key">Edit</string>
 </resources>

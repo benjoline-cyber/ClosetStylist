@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -40,6 +41,7 @@ import coil.compose.AsyncImage
 import com.Ben.closetstylist.R
 import com.Ben.closetstylist.data.ClothingCategory
 import com.Ben.closetstylist.data.ClothingItem
+import com.Ben.closetstylist.ui.common.SkeletonItemGrid
 
 @Composable
 fun ClosetScreen(viewModel: ClosetViewModel, onAddItem: () -> Unit) {
@@ -52,18 +54,12 @@ fun ClosetScreen(viewModel: ClosetViewModel, onAddItem: () -> Unit) {
             }
         },
     ) { innerPadding ->
-        if (uiState.items.isEmpty()) {
-            EmptyCloset(modifier = Modifier.padding(innerPadding))
-        } else {
-            Box(modifier = Modifier.padding(innerPadding)) {
-                ItemGrid(
-                    items = uiState.items,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                FilterRow(
-                    activeFilter = uiState.activeFilter,
-                    onFilterSelected = viewModel::setFilter,
-                )
+        when {
+            !uiState.isLoaded -> SkeletonItemGrid(modifier = Modifier.padding(innerPadding).fillMaxSize())
+            uiState.items.isEmpty() -> EmptyCloset(onAddItem = onAddItem, modifier = Modifier.padding(innerPadding))
+            else -> Box(modifier = Modifier.padding(innerPadding)) {
+                ItemGrid(items = uiState.items, modifier = Modifier.fillMaxSize())
+                FilterRow(activeFilter = uiState.activeFilter, onFilterSelected = viewModel::setFilter)
             }
         }
     }
@@ -122,9 +118,11 @@ private fun ItemGrid(
 }
 
 @Composable
-private fun EmptyCloset(modifier: Modifier = Modifier) {
+private fun EmptyCloset(onAddItem: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -132,15 +130,26 @@ private fun EmptyCloset(modifier: Modifier = Modifier) {
             painter = painterResource(R.drawable.ic_empty_closet),
             contentDescription = null,
             modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
             text = stringResource(R.string.closet_empty),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.closet_empty_body),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onAddItem) {
+            Text(stringResource(R.string.closet_add_first_item))
+        }
     }
 }
 

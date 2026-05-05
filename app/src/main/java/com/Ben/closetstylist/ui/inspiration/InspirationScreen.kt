@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -60,12 +61,14 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.Ben.closetstylist.R
 import com.Ben.closetstylist.data.InspirationPhoto
+import com.Ben.closetstylist.ui.common.SkeletonItemGrid
 import com.Ben.closetstylist.util.createCameraUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InspirationScreen(viewModel: InspirationViewModel) {
     val photos by viewModel.photos.collectAsState()
+    val isLoaded by viewModel.isLoaded.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val sheetState = rememberModalBottomSheetState()
@@ -161,11 +164,14 @@ fun InspirationScreen(viewModel: InspirationViewModel) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        if (photos.isEmpty()) {
+        if (!isLoaded) {
+            SkeletonItemGrid(modifier = Modifier.padding(innerPadding).fillMaxSize())
+        } else if (photos.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -173,15 +179,26 @@ fun InspirationScreen(viewModel: InspirationViewModel) {
                     painter = painterResource(R.drawable.ic_empty_inspiration),
                     contentDescription = null,
                     modifier = Modifier.size(72.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(24.dp))
                 Text(
                     text = stringResource(R.string.inspiration_empty),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.inspiration_empty_body),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
+                Spacer(Modifier.height(24.dp))
+                Button(onClick = { showPicker = true }) {
+                    Text(stringResource(R.string.inspiration_add_first))
+                }
             }
         } else {
             LazyVerticalGrid(

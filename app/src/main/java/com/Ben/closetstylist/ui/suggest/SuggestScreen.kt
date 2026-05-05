@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
@@ -30,7 +31,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,30 +56,40 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.Ben.closetstylist.BuildConfig
 import com.Ben.closetstylist.R
 import com.Ben.closetstylist.domain.StylistPersona
 import com.Ben.closetstylist.domain.WeatherInfo
+import com.Ben.closetstylist.ui.common.SkeletonOutfitCard
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun SuggestScreen(viewModel: SuggestViewModel) {
+fun SuggestScreen(
+    viewModel: SuggestViewModel,
+    onNavigateToCloset: () -> Unit,
+) {
     val uiState by viewModel.uiState.collectAsState()
     val debugOverride by viewModel.debugWeatherOverride.collectAsState()
     val selectedPersona by viewModel.selectedPersona.collectAsState()
     val weatherSummary by viewModel.weatherSummary.collectAsState()
+    val hasInspiration by viewModel.hasInspiration.collectAsState()
+    val itemCount by viewModel.itemCount.collectAsState()
+    val refreshReason by viewModel.refreshReason.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     val woreMessage = stringResource(R.string.suggest_wore_snackbar)
     val dismissedMessage = stringResource(R.string.suggest_dismissed_snackbar)
     val rejectedMessage = stringResource(R.string.suggest_rejected_snackbar)
@@ -116,7 +127,6 @@ fun SuggestScreen(viewModel: SuggestViewModel) {
     }
 
     fun requestAndGenerate() {
-        // Skip location entirely when the debug override is active.
         if (BuildConfig.DEBUG && debugOverride != null) {
             viewModel.generateSuggestions()
             return
@@ -145,16 +155,35 @@ fun SuggestScreen(viewModel: SuggestViewModel) {
             Spacer(Modifier.height(16.dp))
 
             if (weatherSummary.isNotBlank()) {
-                WeatherStrip(summary = weatherSummary, onClick = { requestAndGenerate() })
+                WeatherStrip(
+                    summary = weatherSummary,
+                    isStale = uiState.weatherStale,
+                    onClick = { requestAndGenerate() },
+                )
                 Spacer(Modifier.height(8.dp))
             }
 
-            PersonaPicker(
-                selected = selectedPersona,
-                onSelect = viewModel::selectPersona,
-            )
+            PersonaPicker(selected = selectedPersona, onSelect = viewModel::selectPersona)
 
             Spacer(Modifier.height(12.dp))
+
+            // Tip banner when inspiration gallery is empty and closet has items
+            if (!hasInspiration && itemCount > 0 && uiState.outfits.isEmpty() && !uiState.isLoading) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        stringResource(R.string.suggest_tip_inspiration),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+            }
 
             Button(
                 onClick = { requestAndGenerate() },
@@ -175,33 +204,51 @@ fun SuggestScreen(viewModel: SuggestViewModel) {
 
             when {
                 uiState.isLoading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                stringResource(R.string.suggest_generating),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    Spacer(Modifier.height(16.dp))
+                    if (uiState.loadingCaption.isNotBlank()) {
+                        Text(
+                            uiState.loadingCaption,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        repeat(3) { SkeletonOutfitCard() }
                     }
                 }
 
+                uiState.awaitingWeatherChoice -> {
+                    Spacer(Modifier.height(24.dp))
+                    WeatherPresetPicker(
+                        onSelect = { viewModel.selectWeatherPreset(it) },
+                    )
+                }
+
                 uiState.error != null -> {
-                    val errorMessage = uiState.error ?: ""
+                    val isEmptyCloset = uiState.error == stringResource(R.string.error_suggest_empty_closet)
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(horizontal = 24.dp),
                         ) {
                             Text(
-                                errorMessage,
+                                uiState.error ?: "",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
                             )
-                            OutlinedButton(onClick = { requestAndGenerate() }) {
-                                Text(stringResource(R.string.suggest_retry))
+                            if (isEmptyCloset) {
+                                Button(onClick = onNavigateToCloset) {
+                                    Text(stringResource(R.string.suggest_go_to_closet))
+                                }
+                            } else {
+                                OutlinedButton(onClick = { requestAndGenerate() }) {
+                                    Text(stringResource(R.string.suggest_retry))
+                                }
                             }
                         }
                     }
@@ -209,24 +256,61 @@ fun SuggestScreen(viewModel: SuggestViewModel) {
 
                 uiState.outfits.isNotEmpty() -> {
                     Spacer(Modifier.height(8.dp))
+
+                    // Staggered reveal: cards become visible with 80ms delay each.
+                    var visibleCount by remember(uiState.outfits) { mutableIntStateOf(0) }
+                    LaunchedEffect(uiState.outfits) {
+                        if (uiState.outfits.isNotEmpty()) {
+                            uiState.outfits.indices.forEach { i ->
+                                delay(i * 80L)
+                                visibleCount = i + 1
+                            }
+                        }
+                    }
+
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         uiState.outfits.forEachIndexed { index, outfit ->
                             AnimatedVisibility(
-                                visible = outfit.cardKey !in uiState.collapsedKeys,
+                                visible = index < visibleCount && outfit.cardKey !in uiState.collapsedKeys,
+                                enter = fadeIn(animationSpec = tween(300)),
                                 exit = shrinkVertically() + fadeOut(),
-                                enter = fadeIn(),
                             ) {
                                 OutfitCard(
                                     outfit = outfit,
                                     outfitNumber = index + 1,
-                                    onWore = { viewModel.onWore(outfit) },
-                                    onDismissed = { viewModel.onDismissed(outfit) },
-                                    onRejectedCombo = { viewModel.onRejectedCombo(outfit) },
+                                    onWore = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.onWore(outfit)
+                                    },
+                                    onDismissed = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.onDismissed(outfit)
+                                    },
+                                    onRejectedCombo = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.onRejectedCombo(outfit)
+                                    },
                                 )
                             }
+                        }
+
+                        // Refresh with reason
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = refreshReason,
+                            onValueChange = viewModel::onRefreshReasonChange,
+                            placeholder = { Text(stringResource(R.string.suggest_refresh_reason_hint)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        OutlinedButton(
+                            onClick = { requestAndGenerate() },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.suggest_refresh))
                         }
                         Spacer(Modifier.height(8.dp))
                     }
@@ -238,6 +322,8 @@ fun SuggestScreen(viewModel: SuggestViewModel) {
                             stringResource(R.string.suggest_empty_hint),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp),
                         )
                     }
                 }
@@ -249,6 +335,7 @@ fun SuggestScreen(viewModel: SuggestViewModel) {
 @Composable
 private fun WeatherStrip(
     summary: String,
+    isStale: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -264,8 +351,59 @@ private fun WeatherStrip(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(summary, style = MaterialTheme.typography.labelMedium)
+            Column {
+                Text(summary, style = MaterialTheme.typography.labelMedium)
+                if (isStale) {
+                    Text(
+                        stringResource(R.string.suggest_weather_stale),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                    )
+                }
+            }
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun WeatherPresetPicker(
+    onSelect: (WeatherInfo) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val presets = remember {
+        listOf(
+            WeatherInfo(2.0, "cold", "") to R.string.weather_cold,
+            WeatherInfo(14.0, "mild", "") to R.string.weather_mild,
+            WeatherInfo(22.0, "warm", "") to R.string.weather_warm,
+            WeatherInfo(30.0, "hot", "") to R.string.weather_hot,
+        )
+    }
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            stringResource(R.string.suggest_pick_weather),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            presets.forEach { (weather, labelRes) ->
+                OutlinedButton(
+                    onClick = { onSelect(weather) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        stringResource(labelRes),
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
         }
     }
 }
@@ -312,7 +450,7 @@ private fun DebugWeatherPanel(
         ) {
             Text(
                 "DEBUG — weather override",
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
             )
             if (activeOverride != null) {

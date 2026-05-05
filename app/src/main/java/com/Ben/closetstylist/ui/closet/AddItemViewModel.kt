@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.Ben.closetstylist.ClosetStylistApplication
 import com.Ben.closetstylist.R
 import com.Ben.closetstylist.data.ClothingCategory
 import com.Ben.closetstylist.data.ClothingItem
@@ -32,6 +33,7 @@ data class AddItemUiState(
     val colorInput: String = "",
     val seasonTags: Set<Season> = emptySet(),
     val isSaving: Boolean = false,
+    val showPickerOnLoad: Boolean = true,
 )
 
 sealed class AddItemEvent {
@@ -53,6 +55,8 @@ class AddItemViewModel(
 
     // Held separately — ByteArray breaks data-class equality; UI only needs the URI.
     private var compressedBytes: ByteArray? = null
+
+    fun pickerShown() = _uiState.update { it.copy(showPickerOnLoad = false) }
 
     fun setImageUri(uri: Uri) {
         viewModelScope.launch {
@@ -96,12 +100,7 @@ class AddItemViewModel(
                 val filePath = withContext(Dispatchers.IO) {
                     saveToClosetDir(app, bytes, "$id.jpg")
                 }
-                val description = runCatching {
-                    claudeRepository.describeItem(bytes)
-                }.getOrElse { _ ->
-                    _events.emit(AddItemEvent.ShowMessage(app.getString(R.string.error_describe_item)))
-                    ""
-                }
+                // Save immediately with blank description so the user can navigate back right away.
                 clothingRepository.addItem(
                     ClothingItem(
                         id = id,
@@ -109,15 +108,34 @@ class AddItemViewModel(
                         category = state.category,
                         colorTags = state.colorTags,
                         seasonTags = state.seasonTags.toList(),
-                        description = description,
+                        description = "",
                         lastWornDate = null,
                     ),
                 )
-                _events.emit(AddItemEvent.Saved)
-            } catch (e: Exception) {
-                _events.emit(AddItemEvent.ShowMessage(app.getString(R.string.error_save_item)))
-            } finally {
                 _uiState.update { it.copy(isSaving = false) }
+                _events.emit(AddItemEvent.Saved)
+                // Generate description in app-scoped coroutine — survives navigation.
+                val bytesSnapshot = bytes
+                (app as ClosetStylistApplication).applicationScope.launch {
+                    runCatching {
+                        val description = claudeRepository.describeItem(bytesSnapshot)
+                        if (description.isNotBlank()) {
+                            val item = ClothingItem(
+                                id = id,
+                                imagePath = filePath,
+                                category = state.category,
+                                colorTags = state.colorTags,
+                                seasonTags = state.seasonTags.toList(),
+                                description = description,
+                                lastWornDate = null,
+                            )
+                            clothingRepository.updateItem(item)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false) }
+                _events.emit(AddItemEvent.ShowMessage(app.getString(R.string.error_save_item)))
             }
         }
     }
